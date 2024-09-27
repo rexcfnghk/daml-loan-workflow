@@ -1,0 +1,25 @@
+module LoanApprovalWorkflow where
+
+template Loan
+  with
+    bank : Party
+    borrower : Party
+    amount : Decimal
+  where
+    signatory bank, borrower
+    
+template LoanRequest
+  with
+    bank : Party
+    borrower : Party
+    amount : Decimal
+  where
+    signatory borrower
+    observer bank
+
+    choice ApproveRequest : ContractId Loan
+      with
+        controller bank
+      do
+        create Loan with ..
+    

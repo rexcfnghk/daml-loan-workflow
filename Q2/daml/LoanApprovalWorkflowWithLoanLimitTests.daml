@@ -1,0 +1,105 @@
+module LoanApprovalWorkflowWithLoanLimitTests where
+
+import LoanApprovalWorkflowWithLoanLimit
+import DA.Functor
+import Daml.Script
+
+allocateParties : [Text] -> Script [Party]
+allocateParties = mapA allocateParty
+
+test_bankCanCreateALoanLimit : Script ()
+test_bankCanCreateALoanLimit = do
+    bank <- allocateParty "bank"
+    let limit = 100.0
+    
+    void $ bank `submit` createCmd LoanLimit with amount = limit; ..
+
+test_bankCantApproveALoanRequestWhenLoanAmountIsMoreThanLoanLimit : Script ()
+test_bankCantApproveALoanRequestWhenLoanAmountIsMoreThanLoanLimit = do
+    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+    let limit = 100.0
+    
+    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+
+    let borrowAmount = 110.0
+    loanRequestCid <- 
+      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+    
+    void $ bank `submitMustFail` exerciseCmd loanRequestCid ApproveRequest
+
+test_bankCanApproveALoanRequestWhenLoanAmountIsBelowLoanLimit : Script ()
+test_bankCanApproveALoanRequestWhenLoanAmountIsBelowLoanLimit = do
+    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+    let limit = 100.0
+    
+    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+
+    let borrowAmount = 90.0
+    loanRequestCid <- 
+      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+    
+    void $ bank `submit` exerciseCmd loanRequestCid ApproveRequest
+
+test_bankCanDisburseALoanWithDisburseAmountBelowApprovedAmount : Script ()
+test_bankCanDisburseALoanWithDisburseAmountBelowApprovedAmount = do
+    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+    let limit = 100.0
+    
+    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+
+    let borrowAmount = 90.0
+    loanRequestCid <- 
+      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+    
+    loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
+
+    let disbursement = 20.0
+    void $ bank `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = bank
+
+test_bankCantDisburseALoanWithDisburseAmountAboveApprovedAmount : Script ()
+test_bankCantDisburseALoanWithDisburseAmountAboveApprovedAmount = do
+    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+    let limit = 100.0
+    
+    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+
+    let borrowAmount = 90.0
+    loanRequestCid <- 
+      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+    
+    loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
+
+    let disbursement = 99.0
+    void $ bank `submitMustFail` exerciseCmd loanCid Disburse with amount = disbursement; actor = bank
+
+test_borrowerCanDisburseALoanWithDisburseAmountBelowApprovedAmount : Script ()
+test_borrowerCanDisburseALoanWithDisburseAmountBelowApprovedAmount = do
+    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+    let limit = 100.0
+    
+    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+
+    let borrowAmount = 90.0
+    loanRequestCid <- 
+      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+    
+    loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
+
+    let disbursement = 20.0
+    void $ borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
+
+test_borrowerCantDisburseALoanWithDisburseAmountAboveApprovedAmount : Script ()
+test_borrowerCantDisburseALoanWithDisburseAmountAboveApprovedAmount = do
+    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+    let limit = 100.0
+    
+    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+
+    let borrowAmount = 90.0
+    loanRequestCid <- 
+      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+    
+    loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
+
+    let disbursement = 99.0
+    void $ borrower `submitMustFail` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower

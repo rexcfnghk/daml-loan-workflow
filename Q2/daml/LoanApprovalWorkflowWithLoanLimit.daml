@@ -1,0 +1,71 @@
+module LoanApprovalWorkflowWithLoanLimit where
+
+-- Helper function to calculate the total of tokens, ignoring signs
+tokenValue : [Token] -> Decimal
+tokenValue = sum . fmap (abs . (.value))
+
+template Token
+  with
+    value : Decimal
+    owner : Party
+  where
+    signatory owner
+
+template LoanLimit
+  with
+    amount : Decimal
+    bank : Party
+  where
+    signatory bank
+    ensure amount > 0.0
+    key bank : Party
+    maintainer key
+
+template Loan
+  with
+    bank : Party
+    borrower : Party
+    approvedAmount : Decimal
+    disbursementTotal : [Token]
+  where
+    signatory bank, borrower
+    ensure approvedAmount > 0.0 && tokenValue disbursementTotal <= approvedAmount
+
+    choice Disburse : ContractId Loan
+      with
+        amount : Decimal
+        actor : Party
+      controller actor
+      do
+        assertMsg "Actor must be either be the borrower or the bank" (actor `elem` [borrower, bank])
+        assertMsg "Must disburse more than zero" (amount > 0.0)
+        assertMsg "Cannot disburse more than approved amount" (amount <= approvedAmount)
+
+        let newApprovedAmount = approvedAmount - amount
+        let disbursement = Token with value = amount; owner = borrower
+
+        create disbursement
+        create this with disbursementTotal = disbursement :: disbursementTotal; approvedAmount = newApprovedAmount
+    
+template LoanRequest
+  with
+    bank : Party
+    borrower : Party
+    amount : Decimal
+  where
+    signatory borrower
+    observer bank
+    ensure amount > 0.0
+
+    choice ApproveRequest : ContractId Loan
+      controller bank
+      do
+        (loanLimitCid, loanLimit) <- fetchByKey @LoanLimit bank
+        
+        assertMsg "Cannot loan more than loan limit" (amount <= loanLimit.amount)
+
+        let newLimit = loanLimit.amount - amount
+        archive loanLimitCid
+        create LoanLimit with amount = newLimit, ..
+
+        create Loan with disbursementTotal = []; approvedAmount = amount; ..
