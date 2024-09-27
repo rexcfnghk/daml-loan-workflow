@@ -1,11 +1,11 @@
 module LoanWorkflowWithRepayment where
 
--- Helper function to calculate the total of tokens, ignoring signs
-tokenValue : [Token] -> Decimal
-tokenValue = sum . fmap (abs . (.value))
+import DA.Foldable as FO
+import ReverseSortedList as RSV
 
-findLargestTokenFulfillingRepayment : Decimal -> [Token] -> Optional Token
-findLargestTokenFulfillingRepayment repayment = find ((>= repayment) . (.value))
+-- Helper function to calculate the total of tokens, ignoring signs
+tokenValue : ReverseSortedList Token -> Decimal
+tokenValue = FO.sum . fmap (.value)
 
 template Token
   with
@@ -13,6 +13,9 @@ template Token
     owner : Party
   where
     signatory owner
+
+instance Ord Token where
+  x `compare` y = x.value `compare` y.value
 
 template LoanLimit
   with
@@ -41,7 +44,7 @@ template Loan
     bank : Party
     borrower : Party
     approvedAmount : Decimal
-    disbursementTotal : [Token]
+    disbursementTotal : ReverseSortedList Token
   where
     signatory bank, borrower
     ensure approvedAmount > 0.0 && bank /= borrower && tokenValue disbursementTotal <= approvedAmount
@@ -52,15 +55,16 @@ template Loan
         actor : Party
       controller actor
       do
-        assertMsg "Actor must be either be the borrower or the bank" (actor `elem` [borrower, bank])
+        assertMsg "Actor must be either be the borrower or the bank" (actor `FO.elem` [borrower, bank])
         assertMsg "Must disburse greater than zero" (amount > 0.0)
         assertMsg "Cannot disburse greater than approved amount" (amount <= approvedAmount)
 
         let newApprovedAmount = approvedAmount - amount
         let disbursement = Token with value = amount; owner = borrower
+        let newDisbursementTotal = disbursement `RSV.cons` disbursementTotal
 
         create disbursement
-        create this with disbursementTotal = disbursement :: disbursementTotal; approvedAmount = newApprovedAmount
+        create this with disbursementTotal = newDisbursementTotal; approvedAmount = newApprovedAmount
 
     choice Repay : ContractId Loan
       with
@@ -95,4 +99,4 @@ template LoanRequest
         archive loanLimitCid
         create LoanLimit with amount = newLimit, ..
 
-        create Loan with disbursementTotal = []; approvedAmount = amount; ..
+        create Loan with disbursementTotal = empty; approvedAmount = amount; ..

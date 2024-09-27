@@ -1,0 +1,41 @@
+module ReverseSortedList (
+  ReverseSortedList,
+  fromList,
+  ReverseSortedList.cons,
+  ReverseSortedList.partition,
+  empty) where
+
+import DA.Bifunctor as B
+import DA.Foldable as F
+import DA.List as L
+
+newtype ReverseSortedList a = ReverseSortedList with unReverseSortedList : [a]
+
+reverseSortList : Ord a => [a] -> [a]
+reverseSortList = L.sortBy (flip compare)
+
+empty : ReverseSortedList a
+empty = ReverseSortedList []
+
+fromList : Ord a => [a] -> ReverseSortedList a
+fromList = ReverseSortedList . reverseSortList
+
+cons : Ord a => a -> ReverseSortedList a -> ReverseSortedList a
+cons x = ReverseSortedList . reverseSortList . (x ::) . unReverseSortedList 
+
+partition : Ord a => a -> ReverseSortedList a -> (ReverseSortedList a, ReverseSortedList a)
+partition needle (ReverseSortedList haystack) =
+  let partitioned = Prelude.partition (<= needle) haystack in
+  B.bimap ReverseSortedList ReverseSortedList partitioned
+
+instance Show a => Show (ReverseSortedList a) where
+  show = show . unReverseSortedList
+
+instance Eq a => Eq (ReverseSortedList a) where
+  ReverseSortedList x == ReverseSortedList y = x == y
+
+instance Functor ReverseSortedList where
+  fmap f = ReverseSortedList . fmap f . unReverseSortedList
+
+instance Foldable ReverseSortedList where
+  foldMap f = foldMap f . unReverseSortedList
