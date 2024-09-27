@@ -6,6 +6,7 @@ template Loan
     borrower : Party
     amount : Decimal
   where
+    ensure amount > 0.0 && bank /= borrower
     signatory bank, borrower
     
 template LoanRequest
@@ -14,6 +15,7 @@ template LoanRequest
     borrower : Party
     amount : Decimal
   where
+    ensure amount > 0.0 && bank /= borrower
     signatory borrower
     observer bank
 

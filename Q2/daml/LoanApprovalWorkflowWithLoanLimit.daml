@@ -29,7 +29,7 @@ template Loan
     disbursementTotal : [Token]
   where
     signatory bank, borrower
-    ensure approvedAmount > 0.0 && tokenValue disbursementTotal <= approvedAmount
+    ensure approvedAmount > 0.0 && bank /= borrower && tokenValue disbursementTotal <= approvedAmount
 
     choice Disburse : ContractId Loan
       with
@@ -55,7 +55,7 @@ template LoanRequest
   where
     signatory borrower
     observer bank
-    ensure amount > 0.0
+    ensure amount > 0.0 && bank /= borrower
 
     choice ApproveRequest : ContractId Loan
       controller bank
