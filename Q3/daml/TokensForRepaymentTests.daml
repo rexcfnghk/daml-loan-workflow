@@ -1,0 +1,49 @@
+module TokensForRepaymentTests where
+
+import LoanWorkflowWithRepayment
+import DA.Assert
+import DA.Map as M
+import DA.Traversable as T
+import Daml.Script
+
+allocateParties : [Text] -> Script [Party]
+allocateParties = T.mapA allocateParty
+
+test_GetTokensForRepaymentReturnsExpectedMap_WhenThereAreTokensToFulfilRepaymentAmount : Script ()
+test_GetTokensForRepaymentReturnsExpectedMap_WhenThereAreTokensToFulfilRepaymentAmount = do
+    [ borrower, bank ] <- allocateParties [ "borrower", "bank" ]
+    let tokens = 
+            [ Token { value = 10.0; minter = bank; owner = borrower; shouldArchive = False },
+              Token { value = 200.0; minter = bank; owner = borrower; shouldArchive = False },
+              Token { value = 300.0; minter = bank; owner = borrower; shouldArchive = False } ]
+
+    let tokenCommands = fmap ((bank `submit`) . createCmd) tokens
+
+    tokenCids <- T.sequence tokenCommands
+
+    let tokenMap = M.fromList $ zip tokenCids tokens
+
+    let a = getTokensForRepayment 500.0 tokenMap
+
+    [ Token { value = 200.0; minter = bank; owner = borrower; shouldArchive = False },
+      Token { value = 300.0; minter = bank; owner = borrower; shouldArchive = False } ]
+     === M.values a
+
+test_GetTokensForRepaymentReturnsExpectedMap_WhenThereAreTokenValuesLargerThanFulfilRepaymentAmount : Script ()
+test_GetTokensForRepaymentReturnsExpectedMap_WhenThereAreTokenValuesLargerThanFulfilRepaymentAmount = do
+    [ borrower, bank ] <- allocateParties [ "borrower", "bank" ]
+    let tokens = 
+            [ Token { value = 10.0; minter = bank; owner = borrower; shouldArchive = False },
+              Token { value = 200.0; minter = bank; owner = borrower; shouldArchive = False },
+              Token { value = 300.0; minter = bank; owner = borrower; shouldArchive = False } ]
+
+    let tokenCommands = fmap ((bank `submit`) . createCmd) tokens
+
+    tokenCids <- T.sequence tokenCommands
+
+    let tokenMap = M.fromList $ zip tokenCids tokens
+
+    let a = getTokensForRepayment 21.0 tokenMap
+
+    [ Token { value = 200.0; minter = bank; owner = borrower; shouldArchive = False } ]
+     === M.values a

@@ -1,11 +1,12 @@
 module LoanWorkflowWithRepayment where
 
 import DA.Foldable as F
+import DA.Functor as FU
 import DA.List as L
 import DA.Map as M
 import DA.Map.Extra as ME
 import DA.Traversable as T
-import DA.Tuple as Tu
+import DA.Tuple as TU
 
 -- Helper function to calculate the total of tokens, ignoring signs
 tokenValue : [Token] -> Decimal
@@ -21,7 +22,7 @@ getTokensForRepayment repaymentAmount tokenMap =
     then ME.head greaterThanOrEqualToRepaymentAmount
     else
         let folder k v (out, acc) = 
-              if acc - v.value < 0.0
+              if acc - v.value >= 0.0
               then (M.insert k v out , acc - v.value)
               else (out, 0.0)
         in  fst $ ME.foldrWithKey folder (M.empty, repaymentAmount) lessThanRepaymentAmount
@@ -33,7 +34,14 @@ getDisbursements = T.mapA fetch
 getDisbursementMap : HasFetch a => [ContractId a] -> Update (Map (ContractId a) a)
 getDisbursementMap contractIds =
   M.fromList <$> T.mapA (T.mapA fetch) dupes
-    where dupes = fmap Tu.dupe contractIds
+    where dupes = fmap TU.dupe contractIds
+
+createTokenForChange : Party -> Party -> Decimal -> [Token] -> Optional Token
+createTokenForChange minter owner repayment tokens =
+  if totalTokenValue <= repayment
+  then None
+  else Some $ Token with value = repayment - totalTokenValue; shouldArchive = False; ..
+    where totalTokenValue = tokenValue tokens
 
 template Token
   with
@@ -44,6 +52,7 @@ template Token
   where
     signatory minter
     observer owner
+    ensure value > 0.0 && owner /= minter
 
 template LoanLimit
   with
@@ -72,32 +81,35 @@ template Loan
     bank : Party
     borrower : Party
     approvedAmount : Decimal
+    repaidAmount : Decimal
     disbursementCids : [ContractId Token]
   where
     signatory bank, borrower
-    ensure approvedAmount > 0.0 && bank /= borrower
+    ensure approvedAmount > 0.0 && repaidAmount >= 0.0 && bank /= borrower
 
-    choice Disburse : ContractId Loan
+    choice Disburse : ContractId Token
       with
         amount : Decimal
         actor : Party
       controller actor
       do
         assertMsg "Actor must be either be the borrower or the bank" (actor `L.elem` [borrower, bank])
-        assertMsg "Must disburse greater than zero" (amount > 0.0)
-        assertMsg "Cannot disburse greater than approved amount" (amount <= approvedAmount)
+        assertMsg "Must disburse more than zero" (amount > 0.0)
+        assertMsg "Cannot disburse more than approved amount" (amount <= approvedAmount)
 
-        existingDisbursements <- getDisbursements disbursementCids
+        existingDisbursements <- getDisbursementMap disbursementCids
 
-        let newDisbursement = Token with value = amount; minter = bank; owner = borrower; shouldArchive = False
-            newDisbursementTotal = tokenValue (newDisbursement :: existingDisbursements)
+        let existingDisbursementTotal = tokenValue $ values existingDisbursements
+        let newDisbursementTotal = amount + existingDisbursementTotal
 
-        assertMsg "New disbursement total exceeds approved amount" (newDisbursementTotal <= approvedAmount)
+        assertMsg "Total disbursement amount cannot be more than approved amount" (newDisbursementTotal <= approvedAmount)
 
-        newDisbursementCid <- create newDisbursement
-        let newDisbursementCids = newDisbursementCid :: disbursementCids
+        let disbursement = 
+              Token with value = amount; owner = borrower; minter = bank; shouldArchive = False
+        newDisbursementCid <- create disbursement
 
-        create this with disbursementCids = newDisbursementCids
+        FU.void $ create this with disbursementCids = newDisbursementCid :: keys existingDisbursements
+        pure newDisbursementCid
 
     choice Repay : ContractId Loan
       with
@@ -111,13 +123,27 @@ template Loan
 
         existingDisbursements <- getDisbursementMap disbursementCids
         let repaymentTokens = getTokensForRepayment amount existingDisbursements
+        let repaymentValue = tokenValue $ values repaymentTokens
+        let newRepaidAmount = repaidAmount + repaymentValue
 
-        let newDisbursementKeys = disbursementCids \\ keys repaymentTokens
-        -- let newApprovedAmount
-        -- mapA_ archive $ keys repaymentTokens
+        if newRepaidAmount >= approvedAmount
+        then do
+          mapA_ archive disbursementCids
+          (loanLimitCid, loanLimit) <- fetchByKey @LoanLimit bank
+          let newLimit = amount + approvedAmount
+          archive loanLimitCid
+          void $ create LoanLimit with amount = newLimit; ..
+          pure self
+        else
+          
 
-        undefined
-    
+        -- let newDisbursementKeys = disbursementCids \\ keys repaymentTokens
+        -- -- let newApprovedAmount
+        -- -- mapA_ archive $ keys repaymentTokens
+
+        --mapA_ archive $ keys repaymentTokens
+          
+          undefined    
 template LoanRequest
   with
     bank : Party
@@ -139,4 +165,4 @@ template LoanRequest
         archive loanLimitCid
         create LoanLimit with amount = newLimit, ..
 
-        create Loan with disbursementCids = []; approvedAmount = amount; ..
+        create Loan with disbursementCids = []; approvedAmount = amount; repaidAmount = 0.0; ..
