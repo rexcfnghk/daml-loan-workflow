@@ -38,10 +38,12 @@ getDisbursementMap contractIds =
 template Token
   with
     value : Decimal
+    minter : Party
     owner : Party
     shouldArchive : Bool
   where
-    signatory owner
+    signatory minter
+    observer owner
 
 template LoanLimit
   with
@@ -87,19 +89,15 @@ template Loan
 
         existingDisbursements <- getDisbursements disbursementCids
 
-        let newDisbursement = Token with value = amount; owner = borrower; shouldArchive = False
+        let newDisbursement = Token with value = amount; minter = bank; owner = borrower; shouldArchive = False
             newDisbursementTotal = tokenValue (newDisbursement :: existingDisbursements)
 
         assertMsg "New disbursement total exceeds approved amount" (newDisbursementTotal <= approvedAmount)
 
-        let newApprovedAmount = approvedAmount - amount
-
         newDisbursementCid <- create newDisbursement
         let newDisbursementCids = newDisbursementCid :: disbursementCids
 
-        create this with 
-          disbursementCids = newDisbursementCids
-          approvedAmount = newApprovedAmount
+        create this with disbursementCids = newDisbursementCids
 
     choice Repay : ContractId Loan
       with

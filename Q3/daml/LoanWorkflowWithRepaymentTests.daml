@@ -72,6 +72,25 @@ test_bankCantDisburseALoanWithDisburseAmountAboveApprovedAmount = do
     let disbursement = 99.0
     void $ bank `submitMustFail` exerciseCmd loanCid Disburse with amount = disbursement; actor = bank
 
+test_bankCantDisburseALoanWithDisburseAmountAboveApprovedAmountWithExistingDisbursement : Script ()
+test_bankCantDisburseALoanWithDisburseAmountAboveApprovedAmountWithExistingDisbursement = do
+    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+    let limit = 100.0
+    
+    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+
+    let borrowAmount = 90.0
+    loanRequestCid <- 
+      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+    
+    loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
+
+    let disbursement = 89.0
+    newLoanCid <- bank `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = bank
+
+    let newDisbursement = 1.0
+    void $ bank `submit` exerciseCmd newLoanCid Disburse with amount = newDisbursement; actor = bank
+
 test_borrowerCanDisburseALoanWithDisburseAmountBelowApprovedAmount : Script ()
 test_borrowerCanDisburseALoanWithDisburseAmountBelowApprovedAmount = do
     [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]

@@ -7,9 +7,11 @@ tokenValue = sum . fmap (abs . (.value))
 template Token
   with
     value : Decimal
+    minter : Party
     owner : Party
   where
-    signatory owner
+    signatory minter
+    observer owner
 
 template LoanLimit
   with
@@ -41,7 +43,7 @@ template Loan
         assertMsg "Must disburse more than zero" (amount > 0.0)
         assertMsg "Cannot disburse more than approved amount" (amount <= approvedAmount)
 
-        let disbursement = Token with value = amount; owner = borrower
+        let disbursement = Token with value = amount; owner = borrower; minter = bank
         let newDisburmentTotal = disbursement :: disbursementTotal
         let totalDisbursedAmount = tokenValue newDisburmentTotal
 
