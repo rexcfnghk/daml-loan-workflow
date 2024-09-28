@@ -1,0 +1,15 @@
+module DA.Map.Extra where
+
+import DA.List as L
+import DA.Map as M
+
+head : Ord k => Map k v -> Map k v
+head map =  
+  let (key, value) = L.head $ M.toList $ map
+   in insert key value M.empty
+
+partition : Ord k => (v -> Bool) -> Map k v -> (Map k v, Map k v)
+partition p m = (M.filter p m, M.filter (not . p) m)
+
+foldrWithKey : Ord k => (k -> v -> z -> z) -> z -> Map k v -> z
+foldrWithKey folder state map = L.foldr (uncurry folder) state $ M.toList map 

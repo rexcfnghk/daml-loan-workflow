@@ -41,11 +41,14 @@ template Loan
         assertMsg "Must disburse more than zero" (amount > 0.0)
         assertMsg "Cannot disburse more than approved amount" (amount <= approvedAmount)
 
-        let newApprovedAmount = approvedAmount - amount
         let disbursement = Token with value = amount; owner = borrower
+        let newDisburmentTotal = disbursement :: disbursementTotal
+        let totalDisbursedAmount = tokenValue newDisburmentTotal
+
+        assertMsg "Total disbursement amount cannot be more than approved amount" (totalDisbursedAmount <= approvedAmount)
 
         create disbursement
-        create this with disbursementTotal = disbursement :: disbursementTotal; approvedAmount = newApprovedAmount
+        create this with disbursementTotal = newDisburmentTotal
     
 template LoanRequest
   with

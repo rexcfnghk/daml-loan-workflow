@@ -1,21 +1,47 @@
 module LoanWorkflowWithRepayment where
 
-import DA.Foldable as FO
-import ReverseSortedList as RSV
+import DA.Foldable as F
+import DA.List as L
+import DA.Map as M
+import DA.Map.Extra as ME
+import DA.Traversable as T
+import DA.Tuple as Tu
 
 -- Helper function to calculate the total of tokens, ignoring signs
-tokenValue : ReverseSortedList Token -> Decimal
-tokenValue = FO.sum . fmap (.value)
+tokenValue : [Token] -> Decimal
+tokenValue = F.sum . fmap (.value)
+
+-- Helper function to calculate the tokens required to repay a specified amount
+getTokensForRepayment : Decimal -> Map (ContractId Token) Token -> Map (ContractId Token) Token
+getTokensForRepayment repaymentAmount tokenMap =
+  let (greaterThanOrEqualToRepaymentAmount, lessThanRepaymentAmount) = 
+        ME.partition ((>= repaymentAmount) . (.value)) tokenMap
+  in
+    if not $ M.null greaterThanOrEqualToRepaymentAmount
+    then ME.head greaterThanOrEqualToRepaymentAmount
+    else
+        let folder k v (out, acc) = 
+              if acc - v.value < 0.0
+              then (M.insert k v out , acc - v.value)
+              else (out, 0.0)
+        in  fst $ ME.foldrWithKey folder (M.empty, repaymentAmount) lessThanRepaymentAmount
+
+-- Helper function to fetch all Token contracts from a list of ContractIds
+getDisbursements : HasFetch a => [ContractId a] -> Update [a]
+getDisbursements = T.mapA fetch
+
+getDisbursementMap : HasFetch a => [ContractId a] -> Update (Map (ContractId a) a)
+getDisbursementMap contractIds =
+  M.fromList <$> T.mapA (T.mapA fetch) dupes
+    where dupes = fmap Tu.dupe contractIds
 
 template Token
   with
     value : Decimal
     owner : Party
+    shouldArchive : Bool
   where
     signatory owner
-
-instance Ord Token where
-  x `compare` y = x.value `compare` y.value
 
 template LoanLimit
   with
@@ -44,10 +70,10 @@ template Loan
     bank : Party
     borrower : Party
     approvedAmount : Decimal
-    disbursementTotal : ReverseSortedList Token
+    disbursementCids : [ContractId Token]
   where
     signatory bank, borrower
-    ensure approvedAmount > 0.0 && bank /= borrower && tokenValue disbursementTotal <= approvedAmount
+    ensure approvedAmount > 0.0 && bank /= borrower
 
     choice Disburse : ContractId Loan
       with
@@ -55,16 +81,25 @@ template Loan
         actor : Party
       controller actor
       do
-        assertMsg "Actor must be either be the borrower or the bank" (actor `FO.elem` [borrower, bank])
+        assertMsg "Actor must be either be the borrower or the bank" (actor `L.elem` [borrower, bank])
         assertMsg "Must disburse greater than zero" (amount > 0.0)
         assertMsg "Cannot disburse greater than approved amount" (amount <= approvedAmount)
 
-        let newApprovedAmount = approvedAmount - amount
-        let disbursement = Token with value = amount; owner = borrower
-        let newDisbursementTotal = disbursement `RSV.cons` disbursementTotal
+        existingDisbursements <- getDisbursements disbursementCids
 
-        create disbursement
-        create this with disbursementTotal = newDisbursementTotal; approvedAmount = newApprovedAmount
+        let newDisbursement = Token with value = amount; owner = borrower; shouldArchive = False
+            newDisbursementTotal = tokenValue (newDisbursement :: existingDisbursements)
+
+        assertMsg "New disbursement total exceeds approved amount" (newDisbursementTotal <= approvedAmount)
+
+        let newApprovedAmount = approvedAmount - amount
+
+        newDisbursementCid <- create newDisbursement
+        let newDisbursementCids = newDisbursementCid :: disbursementCids
+
+        create this with 
+          disbursementCids = newDisbursementCids
+          approvedAmount = newApprovedAmount
 
     choice Repay : ContractId Loan
       with
@@ -75,6 +110,13 @@ template Loan
 
         (_, repaymentRestriction) <- fetchByKey @RepaymentRestriction (bank, borrower)
         assertMsg "Repayment amount must be greater than minimum amount specified in repayment restriction" (amount > repaymentRestriction.minimumAmount)
+
+        existingDisbursements <- getDisbursementMap disbursementCids
+        let repaymentTokens = getTokensForRepayment amount existingDisbursements
+
+        let newDisbursementKeys = disbursementCids \\ keys repaymentTokens
+        -- let newApprovedAmount
+        -- mapA_ archive $ keys repaymentTokens
 
         undefined
     
@@ -99,4 +141,4 @@ template LoanRequest
         archive loanLimitCid
         create LoanLimit with amount = newLimit, ..
 
-        create Loan with disbursementTotal = empty; approvedAmount = amount; ..
+        create Loan with disbursementCids = []; approvedAmount = amount; ..
