@@ -47,6 +47,11 @@ addChangeToDisbursements : Optional (ContractId Token) -> [ContractId Token] -> 
 addChangeToDisbursements (Some cid) = (cid ::)
 addChangeToDisbursements None = identity
 
+updateLoanLimit : Decimal -> LoanLimit -> LoanLimit
+updateLoanLimit closedLoan originalLimit =
+  originalLimit with amount = newLimit
+    where newLimit = originalLimit.amount + closedLoan
+
 template Token
   with
     value : Decimal
@@ -128,20 +133,21 @@ template Loan
         existingDisbursements <- getDisbursementMap disbursementCids
 
         let repaymentTokens = getTokensForRepayment amount existingDisbursements
-        let repaymentValue = tokenValue $ values repaymentTokens
-        let newRepaidAmount = repaidAmount + repaymentValue
-        let canCloseLoan = newRepaidAmount >= approvedAmount
+            repaymentValue = tokenValue $ values repaymentTokens
+            newRepaidAmount = repaidAmount + repaymentValue
+            canCloseLoan = newRepaidAmount >= approvedAmount
 
         if canCloseLoan
         then do
           mapA_ archive disbursementCids
 
           (loanLimitCid, loanLimit) <- fetchByKey @LoanLimit bank
-          let newLimit = amount + approvedAmount
+          let newLimit = updateLoanLimit approvedAmount loanLimit
           archive loanLimitCid
-          void $ create LoanLimit with amount = newLimit; ..
+          void $ create newLimit
 
           pure None
+          
         else do
           let changeOpt = createTokenForChange bank borrower amount (values repaymentTokens)
           changeCidOpt <- T.mapA create changeOpt
