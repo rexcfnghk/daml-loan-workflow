@@ -13,9 +13,9 @@ test_GetTokensForRepaymentReturnsExpectedMap_WhenThereAreTokensToFulfilRepayment
 test_GetTokensForRepaymentReturnsExpectedMap_WhenThereAreTokensToFulfilRepaymentAmount = do
     [ borrower, bank ] <- allocateParties [ "borrower", "bank" ]
     let tokens = 
-            [ Token { value = 10.0; minter = bank; owner = borrower; shouldArchive = False },
-              Token { value = 200.0; minter = bank; owner = borrower; shouldArchive = False },
-              Token { value = 300.0; minter = bank; owner = borrower; shouldArchive = False } ]
+            [ Token { value = 10.0; minter = bank; owner = borrower },
+              Token { value = 200.0; minter = bank; owner = borrower },
+              Token { value = 300.0; minter = bank; owner = borrower } ]
 
     let tokenCommands = fmap ((bank `submit`) . createCmd) tokens
 
@@ -25,17 +25,17 @@ test_GetTokensForRepaymentReturnsExpectedMap_WhenThereAreTokensToFulfilRepayment
 
     let a = getTokensForRepayment 500.0 tokenMap
 
-    [ Token { value = 200.0; minter = bank; owner = borrower; shouldArchive = False },
-      Token { value = 300.0; minter = bank; owner = borrower; shouldArchive = False } ]
+    [ Token { value = 200.0; minter = bank; owner = borrower },
+      Token { value = 300.0; minter = bank; owner = borrower } ]
      === M.values a
 
 test_GetTokensForRepaymentReturnsExpectedMap_WhenThereAreTokenValuesLargerThanFulfilRepaymentAmount : Script ()
 test_GetTokensForRepaymentReturnsExpectedMap_WhenThereAreTokenValuesLargerThanFulfilRepaymentAmount = do
     [ borrower, bank ] <- allocateParties [ "borrower", "bank" ]
     let tokens = 
-            [ Token { value = 10.0; minter = bank; owner = borrower; shouldArchive = False },
-              Token { value = 200.0; minter = bank; owner = borrower; shouldArchive = False },
-              Token { value = 300.0; minter = bank; owner = borrower; shouldArchive = False } ]
+            [ Token { value = 10.0; minter = bank; owner = borrower },
+              Token { value = 200.0; minter = bank; owner = borrower },
+              Token { value = 300.0; minter = bank; owner = borrower } ]
 
     let tokenCommands = fmap ((bank `submit`) . createCmd) tokens
 
@@ -45,5 +45,5 @@ test_GetTokensForRepaymentReturnsExpectedMap_WhenThereAreTokenValuesLargerThanFu
 
     let a = getTokensForRepayment 21.0 tokenMap
 
-    [ Token { value = 200.0; minter = bank; owner = borrower; shouldArchive = False } ]
+    [ Token { value = 200.0; minter = bank; owner = borrower } ]
      === M.values a

@@ -40,7 +40,7 @@ createTokenForChange : Party -> Party -> Decimal -> [Token] -> Optional Token
 createTokenForChange minter owner repayment tokens =
   if totalTokenValue <= repayment
   then None
-  else Some $ Token with value = repayment - totalTokenValue; shouldArchive = False; ..
+  else Some $ Token with value = repayment - totalTokenValue; ..
     where totalTokenValue = tokenValue tokens
 
 addChangeToDisbursements : Optional (ContractId Token) -> [ContractId Token] -> [ContractId Token]
@@ -57,7 +57,6 @@ template Token
     value : Decimal
     minter : Party
     owner : Party
-    shouldArchive : Bool
   where
     signatory minter
     observer owner
@@ -114,7 +113,7 @@ template Loan
         assertMsg "Total disbursement amount cannot be more than approved amount" (newDisbursementTotal <= approvedAmount)
 
         let disbursement = 
-              Token with value = amount; owner = borrower; minter = bank; shouldArchive = False
+              Token with value = amount; owner = borrower; minter = bank
         newDisbursementCid <- create disbursement
         newLoanCid <- create this with disbursementCids = newDisbursementCid :: keys existingDisbursements
 
@@ -147,7 +146,7 @@ template Loan
           void $ create newLimit
 
           pure None
-          
+
         else do
           let changeOpt = createTokenForChange bank borrower amount (values repaymentTokens)
           changeCidOpt <- T.mapA create changeOpt
