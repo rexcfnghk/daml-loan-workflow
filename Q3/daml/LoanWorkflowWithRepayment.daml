@@ -43,6 +43,10 @@ createTokenForChange minter owner repayment tokens =
   else Some $ Token with value = repayment - totalTokenValue; shouldArchive = False; ..
     where totalTokenValue = tokenValue tokens
 
+addChangeToDisbursements : Optional (ContractId Token) -> [ContractId Token] -> [ContractId Token]
+addChangeToDisbursements (Some cid) = (cid ::)
+addChangeToDisbursements None = identity
+
 template Token
   with
     value : Decimal
@@ -111,7 +115,7 @@ template Loan
 
         pure (newDisbursementCid, newLoanCid)
 
-    choice Repay : ContractId Loan
+    choice Repay : Optional (ContractId Loan)
       with
         amount : Decimal
       controller borrower
@@ -122,28 +126,33 @@ template Loan
         assertMsg "Repayment amount must be greater than minimum amount specified in repayment restriction" (amount > repaymentRestriction.minimumAmount)
 
         existingDisbursements <- getDisbursementMap disbursementCids
+
         let repaymentTokens = getTokensForRepayment amount existingDisbursements
         let repaymentValue = tokenValue $ values repaymentTokens
         let newRepaidAmount = repaidAmount + repaymentValue
+        let canCloseLoan = newRepaidAmount >= approvedAmount
 
-        if newRepaidAmount >= approvedAmount
+        if canCloseLoan
         then do
           mapA_ archive disbursementCids
+
           (loanLimitCid, loanLimit) <- fetchByKey @LoanLimit bank
           let newLimit = amount + approvedAmount
           archive loanLimitCid
           void $ create LoanLimit with amount = newLimit; ..
-          pure self
-        else
-          
 
-        -- let newDisbursementKeys = disbursementCids \\ keys repaymentTokens
-        -- -- let newApprovedAmount
-        -- -- mapA_ archive $ keys repaymentTokens
+          pure None
+        else do
+          let changeOpt = createTokenForChange bank borrower amount (values repaymentTokens)
+          changeCidOpt <- T.mapA create changeOpt
 
-        --mapA_ archive $ keys repaymentTokens
+          let newDisbursementCids = 
+                addChangeToDisbursements changeCidOpt $ disbursementCids \\ keys repaymentTokens
+
+          mapA_ archive $ keys repaymentTokens
           
-          undefined    
+          Some <$> create this with repaidAmount = newRepaidAmount; disbursementCids = newDisbursementCids 
+
 template LoanRequest
   with
     bank : Party
