@@ -87,7 +87,7 @@ template Loan
     signatory bank, borrower
     ensure approvedAmount > 0.0 && repaidAmount >= 0.0 && bank /= borrower
 
-    choice Disburse : ContractId Token
+    choice Disburse : (ContractId Token, ContractId Loan)
       with
         amount : Decimal
         actor : Party
@@ -107,9 +107,9 @@ template Loan
         let disbursement = 
               Token with value = amount; owner = borrower; minter = bank; shouldArchive = False
         newDisbursementCid <- create disbursement
+        newLoanCid <- create this with disbursementCids = newDisbursementCid :: keys existingDisbursements
 
-        FU.void $ create this with disbursementCids = newDisbursementCid :: keys existingDisbursements
-        pure newDisbursementCid
+        pure (newDisbursementCid, newLoanCid)
 
     choice Repay : ContractId Loan
       with

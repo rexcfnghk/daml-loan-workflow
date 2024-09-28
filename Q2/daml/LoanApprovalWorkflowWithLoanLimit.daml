@@ -1,7 +1,5 @@
 module LoanApprovalWorkflowWithLoanLimit where
 
-import DA.Functor
-
 -- Helper function to calculate the total of tokens, ignoring signs
 tokenValue : [Token] -> Decimal
 tokenValue = sum . fmap (abs . (.value))
@@ -36,7 +34,7 @@ template Loan
     signatory bank, borrower
     ensure approvedAmount > 0.0 && bank /= borrower && tokenValue disbursementTotal <= approvedAmount
 
-    choice Disburse : ContractId Token
+    choice Disburse : (ContractId Token, ContractId Loan)
       with
         amount : Decimal
         actor : Party
@@ -46,14 +44,17 @@ template Loan
         assertMsg "Must disburse more than zero" (amount > 0.0)
         assertMsg "Cannot disburse more than approved amount" (amount <= approvedAmount)
 
-        let disbursement = Token with value = amount; owner = borrower; minter = bank
-        let newDisburmentTotal = disbursement :: disbursementTotal
-        let totalDisbursedAmount = tokenValue newDisburmentTotal
+        let existingDisbursementTotal = tokenValue disbursementTotal
+        let newDisbursementTotal = amount + existingDisbursementTotal
 
-        assertMsg "Total disbursement amount cannot be more than approved amount" (totalDisbursedAmount <= approvedAmount)
+        assertMsg "Total disbursement amount cannot be more than approved amount" (newDisbursementTotal <= approvedAmount)
 
-        void $ create this with disbursementTotal = newDisburmentTotal
-        create disbursement
+        let disbursement = 
+              Token with value = amount; owner = borrower; minter = bank
+        newDisbursementCid <- create disbursement
+        newLoanCid <- create this with disbursementTotal = disbursement :: disbursementTotal
+
+        pure (newDisbursementCid, newLoanCid)
     
 template LoanRequest
   with

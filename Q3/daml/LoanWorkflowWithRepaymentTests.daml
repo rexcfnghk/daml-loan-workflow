@@ -86,7 +86,7 @@ test_bankCantDisburseALoanWithDisburseAmountAboveApprovedAmountWithExistingDisbu
     loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
 
     let disbursement = 89.0
-    newLoanCid <- bank `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = bank
+    (_, newLoanCid) <- bank `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = bank
 
     let newDisbursement = 1.0
     void $ bank `submit` exerciseCmd newLoanCid Disburse with amount = newDisbursement; actor = bank
