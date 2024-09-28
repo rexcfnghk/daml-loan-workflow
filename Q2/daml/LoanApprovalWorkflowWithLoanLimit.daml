@@ -1,5 +1,7 @@
 module LoanApprovalWorkflowWithLoanLimit where
 
+import DA.Functor
+
 -- Helper function to calculate the total of tokens, ignoring signs
 tokenValue : [Token] -> Decimal
 tokenValue = sum . fmap (abs . (.value))
@@ -12,6 +14,7 @@ template Token
   where
     signatory minter
     observer owner
+    ensure value > 0.0 && owner /= minter
 
 template LoanLimit
   with
@@ -33,7 +36,7 @@ template Loan
     signatory bank, borrower
     ensure approvedAmount > 0.0 && bank /= borrower && tokenValue disbursementTotal <= approvedAmount
 
-    choice Disburse : ContractId Loan
+    choice Disburse : ContractId Token
       with
         amount : Decimal
         actor : Party
@@ -49,8 +52,8 @@ template Loan
 
         assertMsg "Total disbursement amount cannot be more than approved amount" (totalDisbursedAmount <= approvedAmount)
 
+        void $ create this with disbursementTotal = newDisburmentTotal
         create disbursement
-        create this with disbursementTotal = newDisburmentTotal
     
 template LoanRequest
   with
