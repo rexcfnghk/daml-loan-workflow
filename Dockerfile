@@ -3,11 +3,11 @@
 ARG SDK_VERSION=2.9.4
 FROM digitalasset/daml-sdk:${SDK_VERSION}
 WORKDIR /Q1
-COPY . .
+COPY ./Q1 .
 RUN daml test
 WORKDIR /Q2
-COPY . .
+COPY ./Q2 .
 RUN daml test
 WORKDIR /Q3
-COPY . .
+COPY ./Q3 .
 RUN daml test
