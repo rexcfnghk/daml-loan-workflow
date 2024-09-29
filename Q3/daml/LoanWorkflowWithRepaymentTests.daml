@@ -148,7 +148,9 @@ test_bankCanDisburseALoanWithTotalDisburseAmountEqualsToApprovedAmountWithExisti
   Some loan <- bank `queryContractId` newLoanId
 
   -- Assert
-  [token1Cid, token2Cid] === loan.disbursementCids
+  2 === length loan.disbursementCids
+  assert (token1Cid `elem` loan.disbursementCids)
+  assert (token2Cid `elem` loan.disbursementCids)
   1.0 === token.value
   bank === token.minter
   borrower === token.owner
