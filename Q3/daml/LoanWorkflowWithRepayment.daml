@@ -5,7 +5,6 @@ import DA.Foldable as F
 import DA.List as L
 import DA.Map as M
 import DA.Map.Extra as ME
-import DA.Optional
 import DA.Traversable as T
 import DA.Tuple as TU
 
