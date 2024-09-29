@@ -85,39 +85,6 @@ template RepaymentRestriction
     key (bank, borrower, loanId) : (Party, Party, Text)
     maintainer key._1
 
-template RepaymentDelegation
-  with
-    borrower : Party
-    bank : Party
-    loanId : Text
-  where
-    signatory bank, borrower
-    ensure bank /= borrower
-    nonconsuming choice RepayLoan : Optional (ContractId Loan)
-      with
-        loanCid : ContractId Loan
-        amount : Decimal
-      controller bank
-      do
-        newLoanCidOpt <- exercise loanCid Repay with .. 
-        when (isNone newLoanCidOpt) (archive self)
-        pure newLoanCidOpt
-
-template RepaymentDelegationProposal
-  with
-    borrower : Party
-    bank : Party
-  where
-    signatory borrower
-    observer bank
-    ensure bank /= borrower
-    choice Accept : ContractId RepaymentDelegation
-      with
-        loanId : Text
-      controller bank
-      do
-        create RepaymentDelegation with ..
-
 template Loan
   with
     id : Text
@@ -160,7 +127,7 @@ template Loan
       with
         loanId : Text
         amount : Decimal
-      controller borrower
+      controller borrower, bank
       do
         assertMsg "Repayment amount must be greater than zero" (amount > 0.0)
 

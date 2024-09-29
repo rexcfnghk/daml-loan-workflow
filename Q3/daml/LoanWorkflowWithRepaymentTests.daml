@@ -227,12 +227,7 @@ test_borrowerCanCompletelyRepayLoanWhenRepaymentAmountMatchesTheOnlyDisbursedTok
   (tokenCid, loanCid) <- 
     borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
 
-  repaymentDelegationProposalCid <-
-    borrower `submit` createCmd RepaymentDelegationProposal with ..
-  repaymentDelegationCid <-
-    bank `submit` exerciseCmd repaymentDelegationProposalCid Accept with loanId
-
   loanCidOpt <-
-    bank `submit` exerciseCmd repaymentDelegationCid RepayLoan with amount = 90.0; ..
+    [borrower, bank] `submitMulti` [] $ exerciseCmd loanCid Repay with amount = 90.0; .. 
 
   assert (isNone loanCidOpt)
