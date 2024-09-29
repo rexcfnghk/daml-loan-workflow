@@ -140,8 +140,7 @@ template Loan
         assertMsg "Existing token value must be greater than or equal to repayment amount" (existingTokenValue >= amount)
 
         let repaymentTokens = getTokensForRepayment amount existingDisbursements
-            repaymentValue = tokenValue $ values repaymentTokens
-            newRepaidAmount = repaidAmount + repaymentValue
+            newRepaidAmount = repaidAmount + amount
             canCloseLoan = newRepaidAmount >= approvedAmount
 
         if canCloseLoan
