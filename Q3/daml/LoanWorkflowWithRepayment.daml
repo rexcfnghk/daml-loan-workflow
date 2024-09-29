@@ -77,15 +77,17 @@ template RepaymentRestriction
     minimumAmount : Decimal
     bank : Party
     borrower : Party
+    loanId : Text
   where
     signatory bank
     observer borrower
     ensure minimumAmount > 0.0 && bank /= borrower
-    key (bank, borrower) : (Party, Party)
+    key (bank, borrower, loanId) : (Party, Party, Text)
     maintainer key._1
 
 template Loan
   with
+    id : Text
     bank : Party
     borrower : Party
     approvedAmount : Decimal
@@ -93,6 +95,8 @@ template Loan
     disbursementCids : [ContractId Token]
   where
     signatory bank, borrower
+    key (bank, borrower, id) : (Party, Party, Text)
+    maintainer key._1
     ensure approvedAmount > 0.0 && repaidAmount >= 0.0 && bank /= borrower
 
     choice Disburse : (ContractId Token, ContractId Loan)
@@ -121,12 +125,13 @@ template Loan
 
     choice Repay : Optional (ContractId Loan)
       with
+        loanId : Text
         amount : Decimal
       controller borrower
       do
         assertMsg "Repayment amount must be greater than zero" (amount > 0.0)
 
-        (_, repaymentRestriction) <- fetchByKey @RepaymentRestriction (bank, borrower)
+        (_, repaymentRestriction) <- fetchByKey @RepaymentRestriction (bank, borrower, loanId)
         assertMsg "Repayment amount must be greater than minimum amount specified in repayment restriction" (amount > repaymentRestriction.minimumAmount)
 
         existingDisbursements <- getDisbursementMap disbursementCids
@@ -169,8 +174,13 @@ template LoanRequest
     ensure amount > 0.0 && bank /= borrower
 
     choice ApproveRequest : ContractId Loan
+      with
+        loanId : Text
+        minimumRepaymentAmount : Decimal
       controller bank
       do
+        assertMsg "Minimum repayment amount must be less than or equal to loan amount" (minimumRepaymentAmount <= amount)
+
         (loanLimitCid, loanLimit) <- fetchByKey @LoanLimit bank
         
         assertMsg "Cannot loan more than loan limit" (amount <= loanLimit.amount)
@@ -179,4 +189,13 @@ template LoanRequest
         archive loanLimitCid
         create LoanLimit with amount = newLimit, ..
 
-        create Loan with disbursementCids = []; approvedAmount = amount; repaidAmount = 0.0; ..
+        loanCid <- 
+          create Loan with 
+            id = loanId
+            disbursementCids = []
+            approvedAmount = amount
+            repaidAmount = 0.0; ..
+
+        void $ create RepaymentRestriction with minimumAmount = minimumRepaymentAmount; ..
+
+        pure loanCid
