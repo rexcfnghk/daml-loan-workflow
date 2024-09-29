@@ -28,9 +28,7 @@ getTokensForRepayment repaymentAmount tokenMap =
         in  fst $ ME.foldrWithKey folder (M.empty, repaymentAmount) lessThanRepaymentAmount
 
 -- Helper function to fetch all Token contracts from a list of ContractIds
-getDisbursements : HasFetch a => [ContractId a] -> Update [a]
-getDisbursements = T.mapA fetch
-
+-- and form a Map of ContractId a to a
 getDisbursementMap : HasFetch a => [ContractId a] -> Update (Map (ContractId a) a)
 getDisbursementMap contractIds =
   M.fromList <$> T.mapA (T.mapA fetch) dupes
@@ -42,6 +40,11 @@ createTokenForChange minter owner repayment tokens =
   then None
   else Some $ Token with value = totalTokenValue - repayment; ..
     where totalTokenValue = tokenValue tokens
+
+data RepaymentResult =
+    LoanPaidOff
+  | Accepted with newLoanCid : ContractId Loan; change : Optional (ContractId Token)
+  deriving (Eq, Show)
 
 addChangeToDisbursements : Optional (ContractId Token) -> [ContractId Token] -> [ContractId Token]
 addChangeToDisbursements (Some cid) = (cid ::)
@@ -122,7 +125,7 @@ template Loan
 
         pure (newDisbursementCid, newLoanCid)
 
-    choice Repay : Optional (ContractId Loan)
+    choice Repay : RepaymentResult
       with
         loanId : Text
         amount : Decimal
@@ -154,7 +157,7 @@ template Loan
           archive loanLimitCid
           void $ create newLimit
 
-          pure None
+          pure LoanPaidOff
 
         else do
           let changeOpt = createTokenForChange bank borrower amount (values repaymentTokens)
@@ -165,7 +168,10 @@ template Loan
 
           mapA_ archive $ keys repaymentTokens
           
-          Some <$> create this with repaidAmount = newRepaidAmount; disbursementCids = newDisbursementCids 
+          newLoanCid <- 
+            create this with repaidAmount = newRepaidAmount; disbursementCids = newDisbursementCids 
+          
+          pure $ Accepted with change = changeCidOpt; ..
 
 template LoanRequest
   with
