@@ -393,9 +393,15 @@ test_borrowerCanRepayLoanAndReceiveChange = do
     borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
 
   -- Act
-  Accepted loanCid _ <- [borrower, bank] `submitMulti` [] $ exerciseCmd loanCid Repay with amount = 15.0; ..
+  Accepted loanCid changeCidOpt <- [borrower, bank] `submitMulti` [] $ exerciseCmd loanCid Repay with amount = 15.0; ..
 
   Some loan <- borrower `queryContractId` loanCid
   tokens <- borrower `forceTokens` loan.disbursementCids
 
+  -- Assert
   assert (5.0 `elem` fmap (.value) tokens)
+  assert (isSome changeCidOpt)
+  
+  let (Some changeCid) = changeCidOpt
+  assert (changeCid `elem` loan.disbursementCids)
+  
