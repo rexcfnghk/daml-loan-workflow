@@ -1,4 +1,4 @@
-# Daml Loan Worflow ![CI Status](https://github.com/rexcfnghk/daml-loan-workflow/workflows/docker-image.yml/badge.svg)
+# Daml Loan Worflow ![CI Status](https://github.com/rexcfnghk/daml-loan-workflow/actions/workflows/docker-image.yml/badge.svg)
 
 A demonstration on modelling a loan workflow. The repository is split into three subfolders [Q1], [Q2], and [Q3].
 
