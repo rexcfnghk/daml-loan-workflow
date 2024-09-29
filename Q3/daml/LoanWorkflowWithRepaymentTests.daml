@@ -203,8 +203,8 @@ test_borrowerCantDisburseALoanWithDisburseAmountAboveApprovedAmount = do
   let disbursement = 99.0
   void $ borrower `submitMustFail` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
 
-test_borrowerCanCompletelyRepayLoanWhenRepaymentAmountMatchesOnlyRebursedToken : Script ()
-test_borrowerCanCompletelyRepayLoanWhenRepaymentAmountMatchesOnlyRebursedToken = do
+test_borrowerCanCompletelyRepayLoanWhenRepaymentAmountMatchesTheOnlyDisbursedToken : Script ()
+test_borrowerCanCompletelyRepayLoanWhenRepaymentAmountMatchesTheOnlyDisbursedToken = do
   -- Arrange
   [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
   let limit = 100.0
@@ -221,11 +221,16 @@ test_borrowerCanCompletelyRepayLoanWhenRepaymentAmountMatchesOnlyRebursedToken =
 
   -- Act
   -- Assert
-  -- TODO: Add repayment restriction logic when approving loan request
   let disbursement = 90.0
   (tokenCid, loanCid) <- 
     borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
 
-  loanCidOpt <- borrower `submit` exerciseCmd loanCid Repay with amount = 90.0; ..
+  repaymentDelegationProposalCid <-
+    borrower `submit` createCmd RepaymentDelegationProposal with ..
+  repaymentDelegationCid <-
+    bank `submit` exerciseCmd repaymentDelegationProposalCid Accept with loanId
+
+  loanCidOpt <-
+    bank `submit` exerciseCmd repaymentDelegationCid RepayLoan with amount = 90.0; ..
 
   assert (isNone loanCidOpt)

@@ -1,10 +1,11 @@
 module LoanWorkflowWithRepayment where
 
+import DA.Action
 import DA.Foldable as F
-import DA.Functor as FU
 import DA.List as L
 import DA.Map as M
 import DA.Map.Extra as ME
+import DA.Optional
 import DA.Traversable as T
 import DA.Tuple as TU
 
@@ -60,7 +61,7 @@ template Token
   where
     signatory minter
     observer owner
-    ensure value > 0.0 && owner /= minter
+    ensure value > 0.0
 
 template LoanLimit
   with
@@ -79,11 +80,43 @@ template RepaymentRestriction
     borrower : Party
     loanId : Text
   where
-    signatory bank
-    observer borrower
+    signatory bank, borrower
     ensure minimumAmount > 0.0 && bank /= borrower
     key (bank, borrower, loanId) : (Party, Party, Text)
     maintainer key._1
+
+template RepaymentDelegation
+  with
+    borrower : Party
+    bank : Party
+    loanId : Text
+  where
+    signatory bank, borrower
+    ensure bank /= borrower
+    nonconsuming choice RepayLoan : Optional (ContractId Loan)
+      with
+        loanCid : ContractId Loan
+        amount : Decimal
+      controller bank
+      do
+        newLoanCidOpt <- exercise loanCid Repay with .. 
+        when (isNone newLoanCidOpt) (archive self)
+        pure newLoanCidOpt
+
+template RepaymentDelegationProposal
+  with
+    borrower : Party
+    bank : Party
+  where
+    signatory borrower
+    observer bank
+    ensure bank /= borrower
+    choice Accept : ContractId RepaymentDelegation
+      with
+        loanId : Text
+      controller bank
+      do
+        create RepaymentDelegation with ..
 
 template Loan
   with
@@ -131,7 +164,7 @@ template Loan
       do
         assertMsg "Repayment amount must be greater than zero" (amount > 0.0)
 
-        (_, repaymentRestriction) <- fetchByKey @RepaymentRestriction (bank, borrower, loanId)
+        (repaymentRestrictionCid, repaymentRestriction) <- fetchByKey @RepaymentRestriction (bank, borrower, loanId)
         assertMsg "Repayment amount must be greater than minimum amount specified in repayment restriction" (amount > repaymentRestriction.minimumAmount)
 
         existingDisbursements <- getDisbursementMap disbursementCids
@@ -144,6 +177,8 @@ template Loan
         if canCloseLoan
         then do
           mapA_ archive disbursementCids
+
+          archive repaymentRestrictionCid
 
           (loanLimitCid, loanLimit) <- fetchByKey @LoanLimit bank
           let newLimit = updateLoanLimit approvedAmount loanLimit
