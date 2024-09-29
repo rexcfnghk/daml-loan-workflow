@@ -40,7 +40,7 @@ createTokenForChange : Party -> Party -> Decimal -> [Token] -> Optional Token
 createTokenForChange minter owner repayment tokens =
   if totalTokenValue <= repayment
   then None
-  else Some $ Token with value = repayment - totalTokenValue; ..
+  else Some $ Token with value = totalTokenValue - repayment; ..
     where totalTokenValue = tokenValue tokens
 
 addChangeToDisbursements : Optional (ContractId Token) -> [ContractId Token] -> [ContractId Token]
@@ -131,9 +131,13 @@ template Loan
         assertMsg "Repayment amount must be greater than zero" (amount > 0.0)
 
         (repaymentRestrictionCid, repaymentRestriction) <- fetchByKey @RepaymentRestriction (bank, borrower, loanId)
-        assertMsg "Repayment amount must be greater than minimum amount specified in repayment restriction" (amount > repaymentRestriction.minimumAmount)
+        assertMsg "Repayment amount must be greater than minimum amount specified in repayment restriction" (amount >= repaymentRestriction.minimumAmount)
 
         existingDisbursements <- getDisbursementMap disbursementCids
+
+        let existingTokenValue = tokenValue $ values existingDisbursements
+
+        assertMsg "Existing token value must be greater than or equal to repayment amount" (existingTokenValue >= amount)
 
         let repaymentTokens = getTokensForRepayment amount existingDisbursements
             repaymentValue = tokenValue $ values repaymentTokens

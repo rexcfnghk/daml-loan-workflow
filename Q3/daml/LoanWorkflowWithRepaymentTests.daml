@@ -3,6 +3,7 @@ module LoanWorkflowWithRepaymentTests where
 import LoanWorkflowWithRepayment
 import DA.Assert
 import DA.Functor
+import DA.List
 import DA.Optional
 import Daml.Script
 
@@ -231,3 +232,96 @@ test_borrowerCanCompletelyRepayLoanWhenRepaymentAmountMatchesTheOnlyDisbursedTok
     [borrower, bank] `submitMulti` [] $ exerciseCmd loanCid Repay with amount = 90.0; .. 
 
   assert (isNone loanCidOpt)
+
+test_borrowerCanRepayLoanWhenRepaymentAmountIsLessThanDisbursementTokens : Script ()
+test_borrowerCanRepayLoanWhenRepaymentAmountIsLessThanDisbursementTokens = do
+  -- Arrange
+  [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+  let limit = 100.0
+  
+  loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+
+  let borrowAmount = 90.0
+  loanRequestCid <- 
+    borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+  
+  let minimumRepaymentAmount = 10.0
+  let loanId = "loan1"
+  loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest with ..
+
+  -- Act
+  let disbursement = 90.0
+  (tokenCid, loanCid) <- 
+    borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
+
+  Some loanCid <-
+    [borrower, bank] `submitMulti` [] $ exerciseCmd loanCid Repay with amount = 10.0; ..
+  
+  Some newLoan <- borrower `queryContractId` loanCid
+
+  -- Assert
+  1 === length newLoan.disbursementCids
+  Some token <- borrower `queryContractId` head newLoan.disbursementCids
+  80.0 === token.value
+
+test_borrowerCanRepayLoanWhenRepaymentAmountConsumesOneToken : Script ()
+test_borrowerCanRepayLoanWhenRepaymentAmountConsumesOneToken = do
+  -- Arrange
+  [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+  let limit = 100.0
+  
+  loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+
+  let borrowAmount = 90.0
+  loanRequestCid <- 
+    borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+  
+  let minimumRepaymentAmount = 10.0
+  let loanId = "loan1"
+  loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest with ..
+
+  let disbursement = 20.0
+  (tokenCid, loanCid) <- 
+    borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
+
+  let disbursement = 10.0
+  (tokenCid, loanCid) <- 
+    borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
+
+  -- Act
+  Some loanCid <-
+    [borrower, bank] `submitMulti` [] $ exerciseCmd loanCid Repay with amount = 10.0; ..
+  
+  Some newLoan <- borrower `queryContractId` loanCid
+
+  -- Assert
+  tokens <- mapA (fmap fromSome . (borrower `queryContractId`)) newLoan.disbursementCids
+  20.0 === tokenValue tokens
+
+test_borrowerRepayingLoanShouldFailWhenRepaymentAmountIsGreaterThanRebursedTokens : Script ()
+test_borrowerRepayingLoanShouldFailWhenRepaymentAmountIsGreaterThanRebursedTokens = do
+  -- Arrange
+  [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+  let limit = 100.0
+  
+  loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+
+  let borrowAmount = 90.0
+  loanRequestCid <- 
+    borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+  
+  let minimumRepaymentAmount = 10.0
+  let loanId = "loan1"
+  loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest with ..
+
+  let disbursement = 20.0
+  (tokenCid, loanCid) <- 
+    borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
+
+  let disbursement = 10.0
+  (tokenCid, loanCid) <- 
+    borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
+
+  -- Act
+  [borrower, bank] `submitMultiMustFail` [] $ exerciseCmd loanCid Repay with amount = 50.0; ..
+
