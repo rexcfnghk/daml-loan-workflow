@@ -1,74 +1,44 @@
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/digital-asset/daml/blob/main/LICENSE)
+# Daml Loan Worflow ![CI Status](https://github.com/rexcfnghk/daml-loan-workflow/workflows/docker-image.yml/badge.svg)
 
-# RexNg_TakeHomeAssignment
+A demonstration on modelling a loan workflow. The repository is split into three subfolders [Q1], [Q2], and [Q3].
 
-See [documentation] for details.
-
-[documentation]: https://docs.daml.com/getting-started/installation.html
-
-Please ask for help on [the Daml forum] if you encounter any issue!
-
-[the Daml forum]: https://discuss.daml.com
+[Q1]: ./Q1/
+[Q2]: ./Q2/
+[Q3]: ./Q3/
 
 ## Development Quick Start
 
-You need to have [Node.js] and [Daml] installed.
+### Building from source
 
-[Node.js]: https://nodejs.dev
+You need to have [Daml] installed.
+
 [Daml]: https://docs.daml.com
 
-First, start the Daml components:
+Change directory to the question folder you would like to build. We will use [Q1] as an example.
 
 ```bash
-daml start
-```
-
-This will:
-
-- Build you Daml code once.
-- Generate JavaScript code (and TypeScript definitions) for your Daml types.
-- Start a Daml sandbox gRPC server (on 6865).
-- Start a Daml HTTP JSON API server (on 7575).
-- Watch for the `r` key press (`r` + Enter on Windows); when pressed, rebuild
-  all of the Daml code, push the new DAR to the ledger, and rerun the JS/TS
-  code generation.
-
-Next, start the JS dev server:
-
-```bash
-cd ui
-npm install
-npm start
-```
-
-This starts a server on `http://localhost:3000` which:
-
-- Builds all of your TypeScript (or JavaScript) code (including type
-  definitions from the codegen).
-- Serves the result on :3000, redirecting `/v1` to the JSON API server (on
-  `127.0.0.1:7575`) so API calls are on the same origin as far as your browser
-  is concerned.
-- Watch for changes in TS/JS code (including codegen), and immediately rebuild.
-
-## Deploying to Daml Hub
-
-To build everything from scratch:
-
-```bash
+cd ./Q1
 daml build
-daml codegen js .daml/dist/RexNg_TakeHomeAssignment-0.1.0.dar -o ui/daml.js
-cd ui
-npm install
-npm run-script build
-zip -r ../RexNg_TakeHomeAssignment-ui.zip build
 ```
 
-Next you need to create a ledger on [Daml Hub], upload the files
-`.daml/dist/RexNg_TakeHomeAssignment-0.1.0.dar` (created by the `daml build` command)
-and `RexNg_TakeHomeAssignment-ui.zip` (created by the `zip` command based on the result
-of `npm run-script build`).
+This will build you Daml code once.
 
-[Daml Hub]: https://hub.daml.com
+### Testing
 
-Once both files are uploaded, you need to tell Daml Hub to deploy them. A few
-seconds later, your website should be up and running.
+Each subfolder contains tests written with Daml Script. They can run using
+
+```bash
+cd ./Q1
+daml test
+```
+
+### Containerisation
+
+A [Dockerfile] is also provided to run the tests under all subfolders. This is used in the [GitHub action] for continuous integration.
+
+[Dockerfile]: ./Dockerfile
+[GitHub action]: ./.github/docker-image.yml
+
+## Design Decisions
+
+TBD
