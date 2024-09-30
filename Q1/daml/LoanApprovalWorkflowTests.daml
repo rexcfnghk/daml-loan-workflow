@@ -16,6 +16,13 @@ test_BorrowerCanCreateLoanRequest = do
 
     void $ borrower `submit` createCmd LoanRequest with ..
 
+test_BorrowerCannotCreateLoanRequestWithBankFieldEqualsToBorrower : Script ()
+test_BorrowerCannotCreateLoanRequestWithBankFieldEqualsToBorrower = do
+    let amount = 100.0
+    borrower <- allocateParty "borrower"
+
+    void $ borrower `submitMustFail` createCmd LoanRequest with bank = borrower; borrower; ..
+
 test_BankCanApproveLoanRequest : Script ()
 test_BankCanApproveLoanRequest = do
     let amount = 100.0
@@ -24,6 +31,19 @@ test_BankCanApproveLoanRequest = do
     loanRequest <- borrower `submit` createCmd LoanRequest with ..
 
     void $ bank `submit` exerciseCmd loanRequest ApproveRequest
+
+test_BankCanFetchApproveedLoanWithExpectedAmount : Script ()
+test_BankCanFetchApproveedLoanWithExpectedAmount = do
+    let expected = 100.0
+    [borrower, bank] <- allocateParties ["borrower", "bank"]
+
+    loanRequest <- borrower `submit` createCmd LoanRequest with amount = expected; ..
+
+    loanCid <- bank `submit` exerciseCmd loanRequest ApproveRequest
+
+    Some loan <- bank `queryContractId` loanCid
+
+    expected === loan.amount
 
 test_LoanRequestArchivedAfterApproval : Script ()
 test_LoanRequestArchivedAfterApproval = do
