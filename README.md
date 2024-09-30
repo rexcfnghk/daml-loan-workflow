@@ -65,11 +65,11 @@ The biggest difference between Q2 and Q3 is the fact that `Token`s can now be co
 
 An identifier field for a `Loan` contract, is also introduced for this question as it is not unusual for a `borrower` to have multiple loans made with the same `bank`. As each `Loan` might have different repayment restrictions, a stable contract key is required to link a `Loan` contract to its `RepaymentRestriction` contract. Using only the `bank` and the `borrower` as the key would not suffice as there would be a key collision when there are multiple loans.
 
-The `Repay` choie of the `Loan` contract requires the simultaneous consent of both the `bank` and the `borrower`. After some thought I came to the conclusion that this is a reasonable assumption  as part of the repayment logic would require the archival of `Token`s or archival of the `LoanLimit` contract, both requires the `bank`'s consent to perform. Initially, the [Delegation Pattern](https://docs.daml.com/daml/patterns/delegation.html) was also considered but it was discarded eventually because assuming repayments require both the `bank`'s' and the `borrower`'s consent seems to match more closely to the real-life business scenario.
+The `Repay` choice of the `Loan` contract requires the simultaneous consent of both the `bank` and the `borrower`. After some thought, I came to the conclusion that this is a reasonable assumption as part of the repayment logic would require the archival of `Token`s or the archival of the `LoanLimit` contract, both require the `bank`'s consent to perform. Initially, the [Delegation Pattern](https://docs.daml.com/daml/patterns/delegation.html) was also considered but it was discarded eventually because assuming repayments require both the `bank`'s' and the `borrower`'s consent seems to match more closely to the real-life business scenario.
 
 The repaid amount of a `Loan` is kept track of in `Loan.repaidAmount`. It is updated every time the `Repay` choice is called, provided the repaid amount is valid.
 
-For the algorithm of performing the repayment, from a high-level perspective, it does the following:
+The algorithm for performing the repayment, from a high-level perspective, does the following:
 
 1. Assert preconditions to make sure the processing can proceed in a reasonable manner, such as checking if the repayment amount is greater than the minimum repayment amount specified in `RepaymentRestriction`.
 2. Retrieve all existing disbursed tokens by doing `fetch`es on the list of `ContractId Token`.
@@ -79,6 +79,6 @@ For the algorithm of performing the repayment, from a high-level perspective, it
 6. Else, pick a combination of tokens in the latter portion until their value is greater than or equal to the repayment amount.
 7. Determine if change is needed as the tokens picked might have a value greater than the repayment amount.
 8. If change is needed, mint a token that has the change amount as the value
-9. Else, determine whether the loan is paid off when the sum of repayment and the repaid amount is greated than the approved amount
+9. Else, determine whether the loan is paid off when the sum of repayment and the repaid amount is greater than the approved amount
 10. If the loan is paid off, archive the `Loan`, the `RepaymentRestriction` and the `Token`s used in repayment. Update the `LoanLimit` to release the funds used in the loan's approved amount.
 11. Else, return a new `Loan` contract with updated disbursements with an optional `Token` for the change.
