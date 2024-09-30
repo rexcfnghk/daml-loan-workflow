@@ -43,7 +43,8 @@ createTokenForChange minter owner repayment tokens =
   else Some $ Token with value = totalTokenValue - repayment; ..
     where totalTokenValue = tokenValue tokens
 
-addChangeToDisbursements : Optional (ContractId Token) -> [ContractId Token] -> [ContractId Token]
+-- Only add to disbursements when there is a change
+addChangeToDisbursements : Optional a -> [a] -> [a]
 addChangeToDisbursements (Some cid) = (cid ::)
 addChangeToDisbursements None = identity
 
@@ -119,7 +120,7 @@ template Loan
         existingDisbursements <- getDisbursementMap disbursementCids
 
         let existingDisbursementTotal = tokenValue $ values existingDisbursements
-        let newDisbursementTotal = amount + existingDisbursementTotal
+            newDisbursementTotal = amount + existingDisbursementTotal
 
         assertMsg "Total disbursement amount cannot be more than approved amount" (newDisbursementTotal <= approvedAmount)
 
