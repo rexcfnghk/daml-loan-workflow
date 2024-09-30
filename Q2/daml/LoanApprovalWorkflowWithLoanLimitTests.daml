@@ -43,9 +43,9 @@ test_BankCanApproveLoanRequest = do
 
   let amount = 100.0
 
-  loanRequest <- borrower `submit` createCmd LoanRequest with ..
+  loanRequestCid <- borrower `submit` createCmd LoanRequest with ..
 
-  void $ bank `submit` exerciseCmd loanRequest ApproveRequest
+  void $ bank `submit` exerciseCmd loanRequestCid ApproveRequest
 
 test_BankCanFetchApproveedLoanWithExpectedAmount : Script ()
 test_BankCanFetchApproveedLoanWithExpectedAmount = do
@@ -79,7 +79,7 @@ test_LoanRequestArchivedAfterApproval = do
 
   loanRequests <- query @LoanRequest borrower
 
-  loanRequests === []
+  [] === loanRequests
 
 test_ApprovedLoanHasExpectedBorrowerAndBank : Script ()
 test_ApprovedLoanHasExpectedBorrowerAndBank = do
@@ -103,8 +103,8 @@ test_ApprovedLoanHasExpectedBorrowerAndBank = do
   fromBanksPerspective === fromBorrowersPerspective
 
   let (Some contract) = fromBanksPerspective
-  contract.bank === bank
-  contract.borrower === borrower
+  bank === contract.bank
+  borrower === contract.borrower
 
 test_bankCanDisburseALoanWithDisburseAmountBelowApprovedAmount : Script ()
 test_bankCanDisburseALoanWithDisburseAmountBelowApprovedAmount = do
@@ -120,7 +120,12 @@ test_bankCanDisburseALoanWithDisburseAmountBelowApprovedAmount = do
   loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
 
   let disbursement = 20.0
-  void $ bank `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = bank
+  (tokenCid, loanCid) <- bank `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = bank
+
+  Some loan <- bank `queryContractId` loanCid
+  20.0 === tokenValue loan.disbursements
+  Some token <- bank `queryContractId` tokenCid
+  20.0 === token.value
 
 test_bankCantDisburseALoanWithDisburseAmountAboveApprovedAmount : Script ()
 test_bankCantDisburseALoanWithDisburseAmountAboveApprovedAmount = do
@@ -152,7 +157,12 @@ test_borrowerCanDisburseALoanWithDisburseAmountBelowApprovedAmount = do
   loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
 
   let disbursement = 20.0
-  void $ borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
+  (tokenCid, loanCid) <- borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
+
+  Some loan <- bank `queryContractId` loanCid
+  20.0 === tokenValue loan.disbursements
+  Some token <- bank `queryContractId` tokenCid
+  20.0 === token.value
 
 test_borrowerCantDisburseALoanWithDisburseAmountAboveApprovedAmount : Script ()
 test_borrowerCantDisburseALoanWithDisburseAmountAboveApprovedAmount = do
@@ -169,3 +179,4 @@ test_borrowerCantDisburseALoanWithDisburseAmountAboveApprovedAmount = do
 
   let disbursement = 99.0
   void $ borrower `submitMustFail` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
+  

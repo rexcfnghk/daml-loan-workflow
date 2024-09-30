@@ -51,9 +51,9 @@ template Loan
 
         let disbursement = 
               Token with value = amount; owner = borrower; minter = bank
-        
-        let disbursementCidUpdate = create disbursement
-            loanCidUpdate = create this with disbursements = disbursement :: disbursements
+            disbursementCidUpdate = create disbursement
+            loanCidUpdate = 
+              create this with disbursements = disbursement :: disbursements
 
         liftA2 (,) disbursementCidUpdate loanCidUpdate
     
@@ -75,6 +75,7 @@ template LoanRequest
         assertMsg "Cannot loan more than loan limit" (amount <= loanLimit.amount)
 
         let newLimit = loanLimit.amount - amount
+        
         archive loanLimitCid
           *> create LoanLimit with amount = newLimit, ..
           *> create Loan with 
