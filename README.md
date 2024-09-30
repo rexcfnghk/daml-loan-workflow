@@ -45,7 +45,7 @@ A [Dockerfile] is also provided to run the tests under all subfolders. This is u
 
 For this question, the simplest approach was taken. As two templates `LoanRequest`, `Loan` are required, these form a [Propose and Accept pattern](https://docs.daml.com/daml/patterns/propose-accept.html) to allow two signatories, the `bank` and the `borrower` to come into a bilateral agreement when creating a `Loan` contract.
 
-Common sense assertions are also used in the form of `ensure` clauses to prevent creation of invalid contracts (e.g. negative amount `Loan`s, having a loan contract where the `bank` and the `borrower` are the same party).
+Common sense assertions are also used in the form of `ensure` clauses to prevent the creation of invalid contracts (e.g. negative amount `Loan`s, having a loan contract where the `bank` and the `borrower` are the same party).
 
 Tests are also in place to validate the logic.
 
