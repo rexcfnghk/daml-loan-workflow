@@ -34,6 +34,8 @@ getDisbursementMap contractIds =
   M.fromList <$> T.mapA (T.mapA fetch) dupes
     where dupes = fmap TU.dupe contractIds
 
+-- Since repayment amount might be greater than the total disbursed token value
+-- This function will pontentially return a token with the change
 createTokenForChange : Party -> Party -> Decimal -> [Token] -> Optional Token
 createTokenForChange minter owner repayment tokens =
   if totalTokenValue <= repayment
@@ -41,19 +43,22 @@ createTokenForChange minter owner repayment tokens =
   else Some $ Token with value = totalTokenValue - repayment; ..
     where totalTokenValue = tokenValue tokens
 
-data RepaymentResult =
-    LoanPaidOff
-  | Accepted with newLoanCid : ContractId Loan; change : Optional (ContractId Token)
-  deriving (Eq, Show)
-
 addChangeToDisbursements : Optional (ContractId Token) -> [ContractId Token] -> [ContractId Token]
 addChangeToDisbursements (Some cid) = (cid ::)
 addChangeToDisbursements None = identity
 
-updateLoanLimit : Decimal -> LoanLimit -> LoanLimit
-updateLoanLimit closedLoan originalLimit =
-  originalLimit with amount = newLimit
-    where newLimit = originalLimit.amount + closedLoan
+updateLoanLimit : Party -> Decimal -> Update ()
+updateLoanLimit bank paidOffLoanAmount = do
+  (loanLimitCid, loanLimit) <- fetchByKey @LoanLimit bank
+
+  let newLimit = LoanLimit with amount = loanLimit.amount + paidOffLoanAmount; ..
+  archive loanLimitCid
+  void $ create newLimit
+
+data RepaymentResult =
+    LoanPaidOff
+  | Accepted with newLoanCid : ContractId Loan; change : Optional (ContractId Token)
+  deriving (Eq, Show)
 
 template Token
   with
@@ -152,10 +157,7 @@ template Loan
 
           archive repaymentRestrictionCid
 
-          (loanLimitCid, loanLimit) <- fetchByKey @LoanLimit bank
-          let newLimit = updateLoanLimit approvedAmount loanLimit
-          archive loanLimitCid
-          void $ create newLimit
+          updateLoanLimit bank approvedAmount
 
           pure LoanPaidOff
 
