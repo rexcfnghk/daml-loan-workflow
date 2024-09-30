@@ -29,10 +29,10 @@ template Loan
     bank : Party
     borrower : Party
     approvedAmount : Decimal
-    disbursementTotal : [Token]
+    disbursements : [Token]
   where
     signatory bank, borrower
-    ensure approvedAmount > 0.0 && bank /= borrower && tokenValue disbursementTotal <= approvedAmount
+    ensure approvedAmount > 0.0 && bank /= borrower && tokenValue disbursements <= approvedAmount
 
     choice Disburse : (ContractId Token, ContractId Loan)
       with
@@ -44,7 +44,7 @@ template Loan
         assertMsg "Must disburse more than zero" (amount > 0.0)
         assertMsg "Cannot disburse more than approved amount" (amount <= approvedAmount)
 
-        let existingDisbursementTotal = tokenValue disbursementTotal
+        let existingDisbursementTotal = tokenValue disbursements
             newDisbursementTotal = amount + existingDisbursementTotal
 
         assertMsg "Total disbursement amount cannot be more than approved amount" (newDisbursementTotal <= approvedAmount)
@@ -53,7 +53,7 @@ template Loan
               Token with value = amount; owner = borrower; minter = bank
         
         let disbursementCidUpdate = create disbursement
-            loanCidUpdate = create this with disbursementTotal = disbursement :: disbursementTotal
+            loanCidUpdate = create this with disbursements = disbursement :: disbursements
 
         liftA2 (,) disbursementCidUpdate loanCidUpdate
     
@@ -78,5 +78,5 @@ template LoanRequest
         archive loanLimitCid
           *> create LoanLimit with amount = newLimit, ..
           *> create Loan with 
-              disbursementTotal = []
+              disbursements = []
               approvedAmount = amount; ..
