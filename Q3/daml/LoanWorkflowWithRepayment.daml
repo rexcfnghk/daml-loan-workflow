@@ -55,7 +55,7 @@ updateLoanLimit bank paidOffLoanAmount = do
 
   let newLimit = LoanLimit with amount = loanLimit.amount + paidOffLoanAmount; ..
   archive loanLimitCid
-  void $ create newLimit
+    *> void (create newLimit)
 
 data RepaymentResult =
     LoanPaidOff
