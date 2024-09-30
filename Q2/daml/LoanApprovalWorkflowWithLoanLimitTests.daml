@@ -52,7 +52,6 @@ test_BankCanFetchApproveedLoanWithExpectedAmount = do
   let expected = 100.0
   [borrower, bank] <- allocateParties ["borrower", "bank"]
 
-  bank <- allocateParty "bank"
   let limit = 100.0
   
   void $ bank `submit` createCmd LoanLimit with amount = limit; ..
@@ -70,7 +69,6 @@ test_LoanRequestArchivedAfterApproval = do
   let amount = 100.0
   [borrower, bank] <- allocateParties ["borrower", "bank"]
 
-  bank <- allocateParty "bank"
   let limit = 100.0
   
   void $ bank `submit` createCmd LoanLimit with amount = limit; ..
@@ -87,6 +85,10 @@ test_ApprovedLoanHasExpectedBorrowerAndBank : Script ()
 test_ApprovedLoanHasExpectedBorrowerAndBank = do
   let amount = 100.0
   [borrower, bank] <- allocateParties ["borrower", "bank"]
+
+  let limit = 100.0
+  
+  void $ bank `submit` createCmd LoanLimit with amount = limit; ..
 
   loanRequest <- borrower `submit` createCmd LoanRequest with ..
 
