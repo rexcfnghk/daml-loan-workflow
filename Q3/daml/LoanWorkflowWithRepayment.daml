@@ -1,6 +1,7 @@
 module LoanWorkflowWithRepayment where
 
 import DA.Action
+import DA.Functor
 import DA.Foldable as F
 import DA.List as L
 import DA.Map as M
@@ -152,15 +153,11 @@ template Loan
             canCloseLoan = newRepaidAmount >= approvedAmount
 
         if canCloseLoan
-        then do
+        then
           mapA_ archive disbursementCids
-
-          archive repaymentRestrictionCid
-
-          updateLoanLimit bank approvedAmount
-
-          pure LoanPaidOff
-
+          *> archive repaymentRestrictionCid
+          *> updateLoanLimit bank approvedAmount
+          $> LoanPaidOff
         else do
           let repaymentTokens = getTokensForRepayment amount existingDisbursements
               changeOpt = createTokenForChange bank borrower amount (values repaymentTokens)
@@ -169,12 +166,11 @@ template Loan
           let newDisbursementCids = 
                 addChangeToDisbursements changeCidOpt $ disbursementCids \\ keys repaymentTokens
 
-          mapA_ archive $ keys repaymentTokens
-          
           newLoanCid <- 
             create this with repaidAmount = newRepaidAmount; disbursementCids = newDisbursementCids 
           
-          pure $ Accepted with change = changeCidOpt; ..
+          mapA_ archive (keys repaymentTokens)
+            $> Accepted with change = changeCidOpt; ..
 
 template LoanRequest
   with
@@ -199,16 +195,12 @@ template LoanRequest
         assertMsg "Cannot loan more than loan limit" (amount <= loanLimit.amount)
 
         let newLimit = loanLimit.amount - amount
+
         archive loanLimitCid
-        create LoanLimit with amount = newLimit, ..
-
-        loanCid <- 
-          create Loan with 
-            id = loanId
-            disbursementCids = []
-            approvedAmount = amount
-            repaidAmount = 0.0; ..
-
-        void $ create RepaymentRestriction with minimumAmount = minimumRepaymentAmount; ..
-
-        pure loanCid
+          *> create LoanLimit with amount = newLimit, ..
+          *> create RepaymentRestriction with minimumAmount = minimumRepaymentAmount; ..
+          *> create Loan with 
+              id = loanId
+              disbursementCids = []
+              approvedAmount = amount
+              repaidAmount = 0.0; ..

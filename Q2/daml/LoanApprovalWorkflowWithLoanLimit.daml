@@ -45,16 +45,17 @@ template Loan
         assertMsg "Cannot disburse more than approved amount" (amount <= approvedAmount)
 
         let existingDisbursementTotal = tokenValue disbursementTotal
-        let newDisbursementTotal = amount + existingDisbursementTotal
+            newDisbursementTotal = amount + existingDisbursementTotal
 
         assertMsg "Total disbursement amount cannot be more than approved amount" (newDisbursementTotal <= approvedAmount)
 
         let disbursement = 
               Token with value = amount; owner = borrower; minter = bank
-        newDisbursementCid <- create disbursement
-        newLoanCid <- create this with disbursementTotal = disbursement :: disbursementTotal
+        
+        let disbursementCidUpdate = create disbursement
+            loanCidUpdate = create this with disbursementTotal = disbursement :: disbursementTotal
 
-        pure (newDisbursementCid, newLoanCid)
+        liftA2 (,) disbursementCidUpdate loanCidUpdate
     
 template LoanRequest
   with
@@ -75,6 +76,7 @@ template LoanRequest
 
         let newLimit = loanLimit.amount - amount
         archive loanLimitCid
-        create LoanLimit with amount = newLimit, ..
-
-        create Loan with disbursementTotal = []; approvedAmount = amount; ..
+          *> create LoanLimit with amount = newLimit, ..
+          *> create Loan with 
+              disbursementTotal = []
+              approvedAmount = amount; ..
