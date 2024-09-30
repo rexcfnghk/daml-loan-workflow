@@ -11,70 +11,70 @@ allocateParties = mapA allocateParty
 
 test_BorrowerCanCreateLoanRequest : Script ()
 test_BorrowerCanCreateLoanRequest = do
-    let amount = 100.0
-    [borrower, bank] <- allocateParties ["borrower", "bank"]
+  let amount = 100.0
+  [borrower, bank] <- allocateParties ["borrower", "bank"]
 
-    void $ borrower `submit` createCmd LoanRequest with ..
+  void $ borrower `submit` createCmd LoanRequest with ..
 
 test_BorrowerCannotCreateLoanRequestWithBankFieldEqualsToBorrower : Script ()
 test_BorrowerCannotCreateLoanRequestWithBankFieldEqualsToBorrower = do
-    let amount = 100.0
-    borrower <- allocateParty "borrower"
+  let amount = 100.0
+  borrower <- allocateParty "borrower"
 
-    void $ borrower `submitMustFail` createCmd LoanRequest with bank = borrower; borrower; ..
+  void $ borrower `submitMustFail` createCmd LoanRequest with bank = borrower; borrower; ..
 
 test_BankCanApproveLoanRequest : Script ()
 test_BankCanApproveLoanRequest = do
-    let amount = 100.0
-    [borrower, bank] <- allocateParties ["borrower", "bank"]
+  let amount = 100.0
+  [borrower, bank] <- allocateParties ["borrower", "bank"]
 
-    loanRequest <- borrower `submit` createCmd LoanRequest with ..
+  loanRequest <- borrower `submit` createCmd LoanRequest with ..
 
-    void $ bank `submit` exerciseCmd loanRequest ApproveRequest
+  void $ bank `submit` exerciseCmd loanRequest ApproveRequest
 
 test_BankCanFetchApproveedLoanWithExpectedAmount : Script ()
 test_BankCanFetchApproveedLoanWithExpectedAmount = do
-    let expected = 100.0
-    [borrower, bank] <- allocateParties ["borrower", "bank"]
+  let expected = 100.0
+  [borrower, bank] <- allocateParties ["borrower", "bank"]
 
-    loanRequest <- borrower `submit` createCmd LoanRequest with amount = expected; ..
+  loanRequest <- borrower `submit` createCmd LoanRequest with amount = expected; ..
 
-    loanCid <- bank `submit` exerciseCmd loanRequest ApproveRequest
+  loanCid <- bank `submit` exerciseCmd loanRequest ApproveRequest
 
-    Some loan <- bank `queryContractId` loanCid
+  Some loan <- bank `queryContractId` loanCid
 
-    expected === loan.amount
+  expected === loan.amount
 
 test_LoanRequestArchivedAfterApproval : Script ()
 test_LoanRequestArchivedAfterApproval = do
-    let amount = 100.0
-    [borrower, bank] <- allocateParties ["borrower", "bank"]
+  let amount = 100.0
+  [borrower, bank] <- allocateParties ["borrower", "bank"]
 
-    loanRequest <- borrower `submit` createCmd LoanRequest with ..
+  loanRequest <- borrower `submit` createCmd LoanRequest with ..
 
-    void $ bank `submit` exerciseCmd loanRequest ApproveRequest
+  void $ bank `submit` exerciseCmd loanRequest ApproveRequest
 
-    loanRequests <- query @LoanRequest borrower
+  loanRequests <- query @LoanRequest borrower
 
-    loanRequests === []
+  loanRequests === []
 
 test_ApprovedLoanHasExpectedBorrowerAndBank : Script ()
 test_ApprovedLoanHasExpectedBorrowerAndBank = do
-    let amount = 100.0
-    [borrower, bank] <- allocateParties ["borrower", "bank"]
+  let amount = 100.0
+  [borrower, bank] <- allocateParties ["borrower", "bank"]
 
-    loanRequest <- borrower `submit` createCmd LoanRequest with ..
+  loanRequest <- borrower `submit` createCmd LoanRequest with ..
 
-    loanContractId <- bank `submit` exerciseCmd loanRequest ApproveRequest
+  loanContractId <- bank `submit` exerciseCmd loanRequest ApproveRequest
 
-    fromBanksPerspective <- bank `queryContractId` loanContractId
-    assert $ isSome fromBanksPerspective
+  fromBanksPerspective <- bank `queryContractId` loanContractId
+  assert $ isSome fromBanksPerspective
 
-    fromBorrowersPerspective <- borrower `queryContractId` loanContractId
-    assert $ isSome fromBorrowersPerspective
+  fromBorrowersPerspective <- borrower `queryContractId` loanContractId
+  assert $ isSome fromBorrowersPerspective
 
-    fromBanksPerspective === fromBorrowersPerspective
+  fromBanksPerspective === fromBorrowersPerspective
 
-    let (Some contract) = fromBanksPerspective
-    contract.bank === bank
-    contract.borrower === borrower
+  let (Some contract) = fromBanksPerspective
+  contract.bank === bank
+  contract.borrower === borrower

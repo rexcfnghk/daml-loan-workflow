@@ -1,7 +1,9 @@
 module LoanApprovalWorkflowWithLoanLimitTests where
 
 import LoanApprovalWorkflowWithLoanLimit
+import DA.Assert
 import DA.Functor
+import DA.Optional
 import Daml.Script
 
 allocateParties : [Text] -> Script [Party]
@@ -9,97 +11,159 @@ allocateParties = mapA allocateParty
 
 test_bankCanCreateALoanLimit : Script ()
 test_bankCanCreateALoanLimit = do
-    bank <- allocateParty "bank"
-    let limit = 100.0
-    
-    void $ bank `submit` createCmd LoanLimit with amount = limit; ..
+  bank <- allocateParty "bank"
+  let limit = 100.0
+  
+  limitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
 
-test_bankCantApproveALoanRequestWhenLoanAmountIsMoreThanLoanLimit : Script ()
-test_bankCantApproveALoanRequestWhenLoanAmountIsMoreThanLoanLimit = do
-    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
-    let limit = 100.0
-    
-    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+  Some limit <- bank `queryContractId` limitCid
 
-    let borrowAmount = 110.0
-    loanRequestCid <- 
-      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
-    
-    void $ bank `submitMustFail` exerciseCmd loanRequestCid ApproveRequest
+  100.0 === limit.amount
 
-test_bankCanApproveALoanRequestWhenLoanAmountIsBelowLoanLimit : Script ()
-test_bankCanApproveALoanRequestWhenLoanAmountIsBelowLoanLimit = do
-    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
-    let limit = 100.0
-    
-    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+test_BorrowerCanCreateLoanRequest : Script ()
+test_BorrowerCanCreateLoanRequest = do
+  let amount = 100.0
+  [borrower, bank] <- allocateParties ["borrower", "bank"]
 
-    let borrowAmount = 90.0
-    loanRequestCid <- 
-      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
-    
-    void $ bank `submit` exerciseCmd loanRequestCid ApproveRequest
+  void $ borrower `submit` createCmd LoanRequest with ..
+
+test_BorrowerCannotCreateLoanRequestWithBankFieldEqualsToBorrower : Script ()
+test_BorrowerCannotCreateLoanRequestWithBankFieldEqualsToBorrower = do
+  let amount = 100.0
+  borrower <- allocateParty "borrower"
+
+  void $ borrower `submitMustFail` createCmd LoanRequest with bank = borrower; borrower; ..
+
+test_BankCanApproveLoanRequest : Script ()
+test_BankCanApproveLoanRequest = do
+  [borrower, bank] <- allocateParties ["borrower", "bank"]
+  let limit = 100.0
+  
+  void $ bank `submit` createCmd LoanLimit with amount = limit; ..
+
+  let amount = 100.0
+
+  loanRequest <- borrower `submit` createCmd LoanRequest with ..
+
+  void $ bank `submit` exerciseCmd loanRequest ApproveRequest
+
+test_BankCanFetchApproveedLoanWithExpectedAmount : Script ()
+test_BankCanFetchApproveedLoanWithExpectedAmount = do
+  let expected = 100.0
+  [borrower, bank] <- allocateParties ["borrower", "bank"]
+
+  bank <- allocateParty "bank"
+  let limit = 100.0
+  
+  void $ bank `submit` createCmd LoanLimit with amount = limit; ..
+
+  loanRequest <- borrower `submit` createCmd LoanRequest with amount = expected; ..
+
+  loanCid <- bank `submit` exerciseCmd loanRequest ApproveRequest
+
+  Some loan <- bank `queryContractId` loanCid
+
+  expected === loan.approvedAmount
+
+test_LoanRequestArchivedAfterApproval : Script ()
+test_LoanRequestArchivedAfterApproval = do
+  let amount = 100.0
+  [borrower, bank] <- allocateParties ["borrower", "bank"]
+
+  bank <- allocateParty "bank"
+  let limit = 100.0
+  
+  void $ bank `submit` createCmd LoanLimit with amount = limit; ..
+
+  loanRequest <- borrower `submit` createCmd LoanRequest with ..
+
+  void $ bank `submit` exerciseCmd loanRequest ApproveRequest
+
+  loanRequests <- query @LoanRequest borrower
+
+  loanRequests === []
+
+test_ApprovedLoanHasExpectedBorrowerAndBank : Script ()
+test_ApprovedLoanHasExpectedBorrowerAndBank = do
+  let amount = 100.0
+  [borrower, bank] <- allocateParties ["borrower", "bank"]
+
+  loanRequest <- borrower `submit` createCmd LoanRequest with ..
+
+  loanContractId <- bank `submit` exerciseCmd loanRequest ApproveRequest
+
+  fromBanksPerspective <- bank `queryContractId` loanContractId
+  assert $ isSome fromBanksPerspective
+
+  fromBorrowersPerspective <- borrower `queryContractId` loanContractId
+  assert $ isSome fromBorrowersPerspective
+
+  fromBanksPerspective === fromBorrowersPerspective
+
+  let (Some contract) = fromBanksPerspective
+  contract.bank === bank
+  contract.borrower === borrower
 
 test_bankCanDisburseALoanWithDisburseAmountBelowApprovedAmount : Script ()
 test_bankCanDisburseALoanWithDisburseAmountBelowApprovedAmount = do
-    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
-    let limit = 100.0
-    
-    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+  [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+  let limit = 100.0
+  
+  loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
 
-    let borrowAmount = 90.0
-    loanRequestCid <- 
-      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
-    
-    loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
+  let borrowAmount = 90.0
+  loanRequestCid <- 
+    borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+  
+  loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
 
-    let disbursement = 20.0
-    void $ bank `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = bank
+  let disbursement = 20.0
+  void $ bank `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = bank
 
 test_bankCantDisburseALoanWithDisburseAmountAboveApprovedAmount : Script ()
 test_bankCantDisburseALoanWithDisburseAmountAboveApprovedAmount = do
-    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
-    let limit = 100.0
-    
-    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+  [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+  let limit = 100.0
+  
+  loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
 
-    let borrowAmount = 90.0
-    loanRequestCid <- 
-      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
-    
-    loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
+  let borrowAmount = 90.0
+  loanRequestCid <- 
+    borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+  
+  loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
 
-    let disbursement = 99.0
-    void $ bank `submitMustFail` exerciseCmd loanCid Disburse with amount = disbursement; actor = bank
+  let disbursement = 99.0
+  void $ bank `submitMustFail` exerciseCmd loanCid Disburse with amount = disbursement; actor = bank
 
 test_borrowerCanDisburseALoanWithDisburseAmountBelowApprovedAmount : Script ()
 test_borrowerCanDisburseALoanWithDisburseAmountBelowApprovedAmount = do
-    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
-    let limit = 100.0
-    
-    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+  [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+  let limit = 100.0
+  
+  loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
 
-    let borrowAmount = 90.0
-    loanRequestCid <- 
-      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
-    
-    loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
+  let borrowAmount = 90.0
+  loanRequestCid <- 
+    borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+  
+  loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
 
-    let disbursement = 20.0
-    void $ borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
+  let disbursement = 20.0
+  void $ borrower `submit` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
 
 test_borrowerCantDisburseALoanWithDisburseAmountAboveApprovedAmount : Script ()
 test_borrowerCantDisburseALoanWithDisburseAmountAboveApprovedAmount = do
-    [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
-    let limit = 100.0
-    
-    loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
+  [ bank, borrower ] <- allocateParties [ "bank", "borrower" ]
+  let limit = 100.0
+  
+  loanLimitCid <- bank `submit` createCmd LoanLimit with amount = limit; ..
 
-    let borrowAmount = 90.0
-    loanRequestCid <- 
-      borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
-    
-    loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
+  let borrowAmount = 90.0
+  loanRequestCid <- 
+    borrower `submit` createCmd LoanRequest with amount = borrowAmount; ..
+  
+  loanCid <- bank `submit` exerciseCmd loanRequestCid ApproveRequest
 
-    let disbursement = 99.0
-    void $ borrower `submitMustFail` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower
+  let disbursement = 99.0
+  void $ borrower `submitMustFail` exerciseCmd loanCid Disburse with amount = disbursement; actor = borrower

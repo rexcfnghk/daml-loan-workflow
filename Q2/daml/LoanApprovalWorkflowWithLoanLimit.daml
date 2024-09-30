@@ -20,7 +20,7 @@ template LoanLimit
     bank : Party
   where
     signatory bank
-    ensure amount > 0.0
+    ensure amount >= 0.0
     key bank : Party
     maintainer key
 
