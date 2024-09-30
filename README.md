@@ -59,6 +59,8 @@ To address the requirement for allowing either the `bank` or the `borrower` to e
 
 For the `LoanLimit` template, it is a deliberate decision to only have one single party, the `bank`, as the signatory because no borrowers should be privy to a bank's loan limit, which is considered internal information of the bank's operations.
 
+Another design choice here is the use of [Applicatives](https://docs.daml.com/daml/stdlib/Prelude.html#class-da-internal-prelude-applicative-9257) instead of [Actions](https://docs.daml.com/daml/stdlib/DA-Action.html) (equivalent to Haskell's monads). Because many choices involve archiving/creating contracts that has no dependencies on monadic values before the expressions, writing these choices in an applicative style could potentially improve performance by parallelising.
+
 ### Q3
 
 The biggest difference between Q2 and Q3 is the fact that `Token`s can now be consumed when repaying a `Loan`, which is why a more sophisticated mechanism of handling `Token`s is created. Instead of storing a list of `Token`s in the `disbursement` field, the contract IDs of `Token` are now stored as the need to handle archiving tokens when they are consumed for repayment is required. This allows a more flexible processing of the `Token`'s lifecycle in a `Loan`.
