@@ -7,7 +7,7 @@ import DA.List as L
 import DA.Map as M
 import DA.Map.Extra as ME
 import DA.Traversable as T
-import DA.Tuple as TU
+import DA.Tuple
 
 -- Helper function to calculate the total of tokens, ignoring signs
 tokenValue : [Token] -> Decimal
@@ -33,7 +33,7 @@ getTokensForRepayment repaymentAmount tokenMap =
 getDisbursementMap : HasFetch a => [ContractId a] -> Update (Map (ContractId a) a)
 getDisbursementMap contractIds =
   M.fromList <$> T.mapA (T.mapA fetch) dupes
-    where dupes = fmap TU.dupe contractIds
+    where dupes = fmap dupe contractIds
 
 -- Since repayment amount might be greater than the total disbursed token value
 -- This function will pontentially return a token with the change
