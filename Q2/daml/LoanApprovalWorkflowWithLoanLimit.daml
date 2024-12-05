@@ -41,8 +41,8 @@ template Loan
       controller actor
       do
         assertMsg "Actor must be either be the borrower or the bank" (actor `elem` [borrower, bank])
-        assertMsg "Must disburse more than zero" (amount > 0.0)
-        assertMsg "Cannot disburse more than approved amount" (amount <= approvedAmount)
+          *> assertMsg "Must disburse more than zero" (amount > 0.0)
+          *> assertMsg "Cannot disburse more than approved amount" (amount <= approvedAmount)
 
         let existingDisbursementTotal = tokenValue disbursements
             newDisbursementTotal = amount + existingDisbursementTotal
