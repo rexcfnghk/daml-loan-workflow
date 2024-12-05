@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG SDK_VERSION=2.9.4
+ARG SDK_VERSION=2.9.5
 FROM digitalasset/daml-sdk:${SDK_VERSION}
 WORKDIR /Q1
 COPY ./Q1 .
